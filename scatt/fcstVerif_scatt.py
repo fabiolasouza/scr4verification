@@ -48,7 +48,7 @@ output=pd.DataFrame(columns=['date_scatt', 'hour_scatt', 'lat_scatt', 'lon_scatt
 #for day in days:
 for HH in analyses:
 	Harmonie_path = '{}/{}/{}/{}/{}/{}'.format(input_file_harm, EXP, year, month, day, HH)
-	file_harm = f'HA40_N25_{year}{month}{day}{HH}00_{fcst}_GB'
+	file_harm = model_file.replace('HH', HH)
 	print('Harmonie_file_path: ', '{}/{}'.format(Harmonie_path,file_harm))
 	data_harm_u = xr.open_dataset('{}/{}'.format(Harmonie_path, file_harm), engine='cfgrib', backend_kwargs={'filter_by_keys':{'stepType':'instant','typeOfLevel':'heightAboveGround', 'shortName':'10u'}, 'indexpath': ''})
 	data_harm_v = xr.open_dataset('{}/{}'.format(Harmonie_path, file_harm), engine='cfgrib', backend_kwargs={'filter_by_keys':{'stepType':'instant','typeOfLevel':'heightAboveGround', 'shortName':'10v'}, 'indexpath': ''})
