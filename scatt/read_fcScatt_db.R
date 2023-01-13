@@ -9,25 +9,25 @@
 #		latS=49,
 #		lonW=0,
 #		lonE=11,
-#		fcst=seq(0,12,6))
+#		lead_time=seq(0,12,6))
 #TODO: query by cycle
-read_fcScatt_db <- function(start_date, end_date, fcst_model, scatt, path, param, latN, latS, lonW, lonE, fcst){
+read_fcScatt_db <- function(start_date, end_date, fcst_model, scatt, path, param, latN, latS, lonW, lonE, lead_time){
         message("Parameter: ", param)
         fcst_out <- list()
         file_list <- file.path(path, fcst_model, paste('HA_', {{scatt}}, '_', {{param}},'_', {{fcst_model}}, '.sqlite', sep=''))
+	start_date <- harpIO::str_datetime_to_unixtime(paste(start_date))
+	end_date <- harpIO::str_datetime_to_unixtime(paste(end_date))
         for (file in file_list) {
                 message("Reading: ",file )
-		start_date <- harpIO::str_datetime_to_unixtime(paste(start_date))
-		end_date <- harpIO::str_datetime_to_unixtime(paste(end_date))
                 con <- DBI::dbConnect(RSQLite::SQLite(), file, flags = RSQLite::SQLITE_RO, synchronous = NULL)
                 df <- DBI::dbGetQuery(con, 'SELECT * FROM SCATT_FCST WHERE lat_scatt<= ? AND lat_scatt>= ? AND lon_scatt>= ? AND lon_scatt<= ? AND fcdate >= ? AND fcdate <= ?', params<-list(latN, latS, lonW, lonE, start_date, end_date))
+		DBI::dbDisconnect(con)
+		df <- subset(df, leadtime %in% lead_time)
 		df$fcdate <- harpIO::unix2datetime(df$fcdate)
 		df$validdate <- harpIO::unix2datetime(df$validdate)
-		df <- subset(df, leadtime %in% fcst)
                 df <- tidyr :: drop_na(df)
-		fcst <- list(tibble :: tibble(df))
-                fcst_out <- append(fcst_out, fcst)
-                DBI::dbDisconnect(con)
+		fc <- list(tibble :: tibble(df))
+                fcst_out <- append(fcst_out, fc)
         }
         names(fcst_out) <- c(fcst_model)
         fcst_out <- structure(fcst_out, class="harp_fcst")

@@ -22,6 +22,9 @@ fcstScatt2sqlite <- function(fcst_model, start_date, end_date, by, fcst, path, s
 	# make a list with ascii files
 	list_files <- list.files(path =file.path(path, fcst_model), pattern = paste0(all_dates, collapse= "|"), full.names = TRUE)
 	# Read all files
+	for (i in list_files){
+		message("Reading: ", i)
+	}
 	data <- lapply(list_files, read.table, header=T)
 	df <- do.call(rbind, data)
 	df <- subset(df, leadtime %in% fcst)
