@@ -1,4 +1,4 @@
-HARMONIE against scatterometer data
+Verification framework developed as part of the MIDAS project (https://www.eumetsat.int/mesoscale-improved-data-assimilations-scatterometer-winds-midas) to access the model 10-m wind performance over the ocean against scatterometer winds.
 
 Pre-processing (previus to harp)
 1. F90 software from OSISAF/KNMI converts scatterometer BUFR to ASCII selecting the right ambiguity for each lat/lon point (https://scatterometer.knmi.nl/bufr_reader/).
