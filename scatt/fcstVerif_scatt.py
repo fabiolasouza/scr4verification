@@ -1,13 +1,12 @@
 #!-*-coding:utf8-*-
-#########################################################################
-#	Script to read model grib files (grid regular_ll) and           # 
-#       scatterometer data to extract files       			# 
-#	used in the statistical verification over the ocean. 		#
-#	Ref: https://scikit-learn.org/stable/modules/generated/		#
-#			sklearn.neighbors.BallTree.html			#
-#	     https://jakevdp.github.io/blog/2013/04/29/		        #
-#		    benchmarking-nearest-neighbor-searches-in-python/   #   
-#########################################################################
+###########################################################################
+#	Script to extract model wind speed and direction (regular_ll)     # 
+#	used in the statistical verification over the ocean. 		  #
+#	Ref: https://scikit-learn.org/stable/modules/generated/		  #
+#			sklearn.neighbors.BallTree.html			  #
+#	     https://jakevdp.github.io/blog/2013/04/29/		          #
+#		    benchmarking-nearest-neighbor-searches-in-python/     #   
+###########################################################################
 import xarray as xr 
 import numpy as np
 import pandas as pd
@@ -44,7 +43,6 @@ analyses = analyses.split()
 output=pd.DataFrame(columns=['date_scatt', 'hour_scatt', 'lat_scatt', 'lon_scatt', 'ws_scatt', 'wdir_scatt', 'u10_scatt', 'v10_scatt', 'analyses_date_time_harm', 
 							'valid_date_time_harm','lat_harm', 'lon_harm', 'ws_harm', 'wdir_harm', 'u10_harm', 'v10_harm', 'leadtime', 'cycle'])
 #start of pre-processing considering each day and DA cycle
-#for day in days:
 for HH in analyses:
 	Harmonie_path = '{}/{}/{}/{}/{}/{}'.format(input_file_harm, EXP, year, month, day, HH)
 	file_harm = model_file.replace('HH', HH)
@@ -58,22 +56,22 @@ for HH in analyses:
 	lon_harm = data_harm_ws['longitude'].values
 	ws_harm = data_harm_ws['ws'].values
 	wdir_harm = data_harm_wdir['wdir'].values
-#correspondent date in scatt file
+	#correspondent date in scatt file
 	date = valid_date_time_harm.isoformat().replace("-", "")
 	date_file_scatt = date.split("T")[0]
-#time restiction
+	#time restiction
 	time1 = valid_date_time_harm - datetime.timedelta(minutes=30)
 	time2 = valid_date_time_harm + datetime.timedelta(minutes=30)
-#open scatterometer file
+	#open scatterometer file
 	scatt_path = '{}/{}'.format(input_file_scatt,scatt)
-	scatt_file = '{}_u10m_{}.txt'.format(scatt_name, date_file_scatt)
+	scatt_file = '{}_{}.txt'.format(scatt_name, date_file_scatt)
 	print('Scatt_file_path:', '{}/{}'.format(scatt_path, scatt_file))
 	scatt_file_size = os.path.getsize('{}/{}'.format(scatt_path, scatt_file))
 	if scatt_file_size == 0:
 		print('scatt_file is EMPTY')
 	else:
 		print('scatt_file is OK')
-		data_scatt = pd.read_csv('{}/{}'.format(scatt_path, scatt_file), sep='\s+', header=None,skiprows=[0], converters={2:str, 3:str}, low_memory=False, error_bad_lines=False)
+		data_scatt = pd.read_csv('{}/{}'.format(scatt_path, scatt_file), sep='\s+', header=None,skiprows=[0], converters={2:str, 3:str}, low_memory=False, error_bad_lines=False, warn_bad_lines=False)
 		data_scatt = data_scatt.where((data_scatt[0] > float(latS)) & (data_scatt[0] < float(latN)) & (data_scatt[1] > float(lonW)) & (data_scatt[1] < float(lonE)))
 		data_scatt.dropna(subset = [0], inplace=True)
 		date_scatt = data_scatt[2]
@@ -82,29 +80,30 @@ for HH in analyses:
 		date_time_scatt = pd.to_datetime(date_time_scatt)
 		data_scatt.index = date_time_scatt #adding date_time_scatt as index
 		slice_data_scatt = data_scatt.loc[time1:time2,:] #1st slice data_scatt considering only date_time_scatt closer to valid_date_time_harm 
-#check if the 1st slice data_scatt file is empty
+		#check if the 1st slice data_scatt file is empty
 		if slice_data_scatt.empty:
-			print('slice_data_scatt is EMPTY -> there are no times to do the 1st slice')
+			print('slice_data_scatt is EMPTY -> there are no data in the time window')
 		else:
 			print('slice_data_scatt is OK!')
 			lat_scatt = slice_data_scatt[0].values
 			lon_scatt = slice_data_scatt[1].values
-#convert degrees to radians and write lat/lon as vectors
-			bt = BallTree(np.deg2rad(np.c_[lat_harm.flatten(),lon_harm.flatten()]), metric='haversine')
-#takes distance between harm and scatt points (distances assuming a sphere of radius 1)
+			lon,lat = np.meshgrid(lon_harm, lat_harm)
+			#convert degrees to radians and write lat/lon as vectors
+			bt = BallTree(np.deg2rad(np.c_[lat.flatten(),lon.flatten()]), metric='haversine')
+			#take distance between harm and scatt points (distances assuming a sphere of radius 1)
 			distances, indices = bt.query(np.deg2rad(np.c_[lat_scatt[:], lon_scatt[:]]))
-#convert distances on the earth in km multiply by radius = 6371km
+			#convert distances on the earth in km multiply by radius = 6371km
 			distances_km=distances*6371
-#consider only points that the distances between harm and scatt are less than 2.5km 
+			#consider only points that the distances between harm and scatt are less than 2.5km 
 			distances_valid = distances_km[distances_km<2.5]
 			print('Number of points satisfying the distance condition in the {}+{}:'.format(HH, fcst), len(distances_valid))
-#takes correspondent indices
+			#take correspondent indices
 			indices_valid = indices[distances_km<2.5]
-#Convert flattened index to multidimensional indexs (harm)
-			index_harm = np.unravel_index(indices_valid, lon_harm.shape)
-#shape iqual to scatt shape
+			#Convert flattened index to multidimensional indexs (harm)
+			index_harm = np.unravel_index(indices_valid, lon.shape)
+			#shape iqual to scatt shape
 			distances_km = distances_km[:,0]
-#takes scatt lat/lon and ws/wdir in accord with distances_km 
+			#take scatt lat/lon and ws/wdir in accord with distances_km 
 			slice_data_scatt_valid = slice_data_scatt[distances_km<2.5]
 			slice_data_scatt_valid = slice_data_scatt_valid.rename(columns={2:'date_scatt', 3:'hour_scatt', 0:'lat_scatt', 	1:'lon_scatt', 4:'ws_scatt', 5:'wdir_scatt'})
 			ws_scatt = slice_data_scatt_valid['ws_scatt'].values
@@ -113,16 +112,16 @@ for HH in analyses:
 			v10_scatt = ws_scatt * np.sin(np.pi*(-90-wdir_scatt)/180.)
 			#slice_data_scatt_valid = slice_data_scatt_valid[['date_scatt', 'hour_scatt', 'lat_scatt', 'lon_scatt', 'ws_scatt', 'wdir_scatt']]
 			slice_data_scatt_valid = slice_data_scatt_valid.assign(u10_scatt = u10_scatt, v10_scatt = v10_scatt)
-#takes harm lat/lon and u/v in accord with distances_km
-			lat_harm_valid=(lat_harm[index_harm])
-			lon_harm_valid=(lon_harm[index_harm])
+			#take harm lat/lon and u/v in accord with distances_km
+			lat_harm_valid=(lat[index_harm])
+			lon_harm_valid=(lon[index_harm])
 			ws_harm_valid = ws_harm[index_harm]
 			wdir_harm_valid = wdir_harm[index_harm]
 			u10_harm_valid = ws_harm_valid * np.cos(np.pi*(-90-wdir_harm_valid)/180.)
 			v10_harm_valid = ws_harm_valid * np.sin(np.pi*(-90-wdir_harm_valid)/180.)
-#add harmonie data in slice_data_scatt_valid DataFrame
+			#add harmonie data in slice_data_scatt_valid DataFrame
 			data_valid=slice_data_scatt_valid.assign(analyses_date_time_harm=analyses_date_time_harm, valid_date_time_harm=valid_date_time_harm, lat_harm=lat_harm_valid, lon_harm=lon_harm_valid, ws_harm= ws_harm_valid, wdir_harm= wdir_harm_valid, u10_harm=u10_harm_valid, v10_harm=v10_harm_valid, leadtime=leadtime, cycle=HH)
 			output=output.append(data_valid)
 #save the file in the correct directory
-output.to_csv('{}/HA_{}_F{}_{}{}{}{}.txt'.format(output_file, scatt_name, fcst, EXP, year, month, day), sep=' ', index=None, float_format='%.4f')
+output.to_csv('{}/{}_F{}_{}{}{}{}{}.txt'.format(output_file, scatt_name, fcst, EXP, year, month, day, HH), sep=' ', index=None, float_format='%.4f')
 print('Tea!')
